@@ -38,16 +38,49 @@ st.markdown("""
 
     /* Mobile-first base */
     .main .block-container {
-        padding: 1rem 1rem 4rem 1rem;
-        max-width: 100%;
+        padding: 0.75rem 0.75rem 5rem 0.75rem !important;
+        max-width: 100% !important;
+    }
+
+    /* ============================================
+       MOBILE RESPONSIVE COLUMNS
+       Make all Streamlit column layouts work on mobile
+       ============================================ */
+
+    /* All horizontal blocks should handle small screens */
+    [data-testid="stHorizontalBlock"] {
+        gap: 0.5rem !important;
+    }
+
+    /* Column children should not have min-width that breaks mobile */
+    [data-testid="stHorizontalBlock"] > div {
+        min-width: 0 !important;
+    }
+
+    /* Buttons in columns should fill available space */
+    [data-testid="stHorizontalBlock"] .stButton > button {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
 
     /* Large touch-friendly inputs */
     .stNumberInput input {
-        font-size: 24px !important;
-        height: 60px !important;
+        font-size: 32px !important;
+        height: 70px !important;
         text-align: center !important;
         border-radius: 12px !important;
+    }
+
+    .stNumberInput [data-testid="stNumberInputContainer"] {
+        width: 100% !important;
+    }
+
+    /* Number input stepper buttons larger for touch */
+    .stNumberInput button {
+        width: 50px !important;
+        height: 70px !important;
     }
 
     .stTextInput input {
@@ -59,16 +92,21 @@ st.markdown("""
     /* Big buttons */
     .stButton > button {
         width: 100%;
-        height: 56px;
-        font-size: 18px !important;
+        height: 48px;
+        font-size: 15px !important;
         font-weight: 600;
-        border-radius: 12px !important;
-        margin: 0.25rem 0;
+        border-radius: 10px !important;
+        margin: 0.15rem 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #EA580C 0%, #DC2626 100%);
         border: none;
+        height: 56px;
+        font-size: 18px !important;
     }
 
     /* Hour selector cards */
@@ -94,35 +132,40 @@ st.markdown("""
     .floor-badge {
         background: linear-gradient(135deg, #EA580C 0%, #DC2626 100%);
         color: white;
-        padding: 0.5rem 1.5rem;
-        border-radius: 24px;
-        font-size: 14px;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 13px;
         font-weight: 600;
         display: inline-block;
-        margin-bottom: 1rem;
     }
 
-    /* Stats cards */
+    /* Stats cards - compact for mobile */
     .stat-card {
         background: white;
-        border-radius: 16px;
-        padding: 1rem;
+        border-radius: 12px;
+        padding: 0.6rem 0.4rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         text-align: center;
-        margin: 0.5rem 0;
+        margin: 0;
+        min-height: 65px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
     .stat-value {
-        font-size: 32px;
+        font-size: 22px;
         font-weight: 700;
         color: #1a1a1a;
+        line-height: 1.2;
     }
 
     .stat-label {
-        font-size: 12px;
+        font-size: 9px;
         color: #666;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
+        margin-top: 0.2rem;
     }
 
     /* Success animation */
@@ -183,6 +226,52 @@ st.markdown("""
         justify-content: center;
         font-size: 14px;
         padding: 0.75rem;
+    }
+
+    /* Divider spacing */
+    hr {
+        margin: 0.75rem 0 !important;
+    }
+
+    /* Section headers */
+    h3 {
+        font-size: 16px !important;
+        margin-bottom: 0.5rem !important;
+        margin-top: 0.25rem !important;
+    }
+
+    /* Radio buttons more touch-friendly */
+    .stRadio > div {
+        gap: 0.5rem !important;
+    }
+
+    .stRadio label {
+        padding: 0.5rem 1rem !important;
+    }
+
+    /* Progress bars */
+    .stProgress > div {
+        height: 24px !important;
+    }
+
+    /* Metrics styling */
+    [data-testid="stMetricValue"] {
+        font-size: 28px !important;
+    }
+
+    /* Reduce vertical spacing between elements */
+    .element-container {
+        margin-bottom: 0.25rem !important;
+    }
+
+    /* Reduce gap between vertical blocks */
+    [data-testid="stVerticalBlock"] {
+        gap: 0.5rem !important;
+    }
+
+    /* Make column gaps tighter on mobile */
+    [data-testid="stHorizontalBlock"] {
+        gap: 0.4rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -277,11 +366,11 @@ def show_floor_entry_view():
     floor_name = user.get('floor_name')
 
     # Header with floor badge and logout
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([5, 1])
     with col1:
         st.markdown(f'<div class="floor-badge">{floor_name}</div>', unsafe_allow_html=True)
     with col2:
-        if st.button("↩️", help="Logout"):
+        if st.button("↩️", help="Logout", use_container_width=True):
             logout()
             st.rerun()
 
@@ -298,7 +387,7 @@ def show_floor_entry_view():
     filled_hours = len(entries_by_hour)
     total_hours = len(hour_slots)
 
-    # Stats row
+    # Stats row - 3 equal columns
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f'''
@@ -311,7 +400,7 @@ def show_floor_entry_view():
         st.markdown(f'''
             <div class="stat-card">
                 <div class="stat-value">{filled_hours}/{total_hours}</div>
-                <div class="stat-label">Hours Logged</div>
+                <div class="stat-label">Hours</div>
             </div>
         ''', unsafe_allow_html=True)
     with col3:
@@ -319,8 +408,8 @@ def show_floor_entry_view():
         last_str = format_hour_slot(last_entry) if last_entry else "-"
         st.markdown(f'''
             <div class="stat-card">
-                <div class="stat-value" style="font-size:20px">{last_str}</div>
-                <div class="stat-label">Last Entry</div>
+                <div class="stat-value">{last_str}</div>
+                <div class="stat-label">Last</div>
             </div>
         ''', unsafe_allow_html=True)
 
@@ -329,29 +418,31 @@ def show_floor_entry_view():
     # Hour selection with big buttons
     st.markdown("### Select Hour")
 
-    # Show hours in a 3-column grid
-    cols = st.columns(3)
     selected_hour = st.session_state.get('selected_hour', current_hour)
 
-    for i, hour in enumerate(hour_slots):
-        with cols[i % 3]:
-            existing_count = entries_by_hour.get(hour)
-            is_current = hour == current_hour
-            is_selected = hour == selected_hour
+    # Show hours in a 2-column grid for mobile friendliness
+    for row_start in range(0, len(hour_slots), 2):
+        row_hours = hour_slots[row_start:row_start + 2]
+        cols = st.columns(2)
 
-            # Button label
-            label = format_hour_slot(hour)
-            if existing_count is not None:
-                label += f" ✓ ({existing_count})"
-            if is_current:
-                label += " ⏰"
+        for i, hour in enumerate(row_hours):
+            with cols[i]:
+                existing_count = entries_by_hour.get(hour)
+                is_current = hour == current_hour
+                is_selected = hour == selected_hour
 
-            # Button type
-            btn_type = "primary" if is_selected else "secondary"
+                # Compact button label
+                label = format_hour_slot(hour)
+                if existing_count is not None:
+                    label += f" ✓"
+                if is_current:
+                    label += " ⏰"
 
-            if st.button(label, key=f"hour_{hour}", type=btn_type, use_container_width=True):
-                st.session_state['selected_hour'] = hour
-                st.rerun()
+                btn_type = "primary" if is_selected else "secondary"
+
+                if st.button(label, key=f"hour_{hour}", type=btn_type, use_container_width=True):
+                    st.session_state['selected_hour'] = hour
+                    st.rerun()
 
     st.markdown("---")
 
@@ -359,7 +450,7 @@ def show_floor_entry_view():
     selected_hour = st.session_state.get('selected_hour', current_hour)
     existing_value = entries_by_hour.get(selected_hour)
 
-    st.markdown(f"### Enter count for {format_hour_slot(selected_hour)}")
+    st.markdown(f"### {format_hour_slot(selected_hour)}")
 
     # Big number input
     count = st.number_input(
@@ -371,13 +462,13 @@ def show_floor_entry_view():
         label_visibility="collapsed"
     )
 
-    # Quick add buttons
+    # Quick add buttons - 3 columns
     st.markdown("**Quick add:**")
-    quick_cols = st.columns(5)
-    quick_values = [10, 25, 50, 100, 500]
+    quick_cols = st.columns(3)
+    quick_values = [10, 50, 100]
     for i, val in enumerate(quick_values):
         with quick_cols[i]:
-            if st.button(f"+{val}", key=f"quick_{val}"):
+            if st.button(f"+{val}", key=f"quick_{val}", use_container_width=True):
                 st.session_state['quick_add'] = count + val
                 st.rerun()
 
