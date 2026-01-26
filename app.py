@@ -106,8 +106,10 @@ st.markdown("""
     .stNumberInput input {
         font-size: 32px !important;
         height: 70px !important;
+        line-height: 70px !important;
         text-align: center !important;
         border-radius: 12px !important;
+        padding: 0 !important;
     }
 
     .stNumberInput [data-testid="stNumberInputContainer"] {
@@ -123,7 +125,15 @@ st.markdown("""
     .stTextInput input {
         font-size: 18px !important;
         height: 50px !important;
+        line-height: 50px !important;
         border-radius: 12px !important;
+        padding: 0 1rem !important;
+    }
+
+    /* Fix text vertical alignment in all inputs */
+    input[type="text"], input[type="password"], input[type="number"] {
+        display: flex !important;
+        align-items: center !important;
     }
 
     /* Big buttons */
@@ -405,6 +415,9 @@ def show_login():
                     'floor_id': selected_floor,
                     'floor_name': floor_options[selected_floor]
                 }
+                # Auto-select current date and hour on login
+                st.session_state['selected_date'] = date.today()
+                st.session_state['selected_hour'] = get_current_hour_slot()
                 st.rerun()
             else:
                 st.error("Invalid PIN")
@@ -445,11 +458,11 @@ def show_floor_entry_view():
     floor_name = user.get('floor_name')
 
     # Header with floor badge and logout
-    col1, col2 = st.columns([5, 1])
+    col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown(f'<div class="floor-badge">{floor_name}</div>', unsafe_allow_html=True)
     with col2:
-        if st.button("↩️", help="Logout", use_container_width=True):
+        if st.button("↩️ Exit", help="Logout", use_container_width=True):
             logout()
             st.rerun()
 
@@ -548,14 +561,20 @@ def show_floor_entry_view():
 
     st.markdown(f"### {format_hour_slot(selected_hour)}")
 
+    # Check if there's a quick add value to apply
+    default_count = existing_value if existing_value else 0
+    if 'quick_add' in st.session_state:
+        default_count = st.session_state.pop('quick_add')
+
     # Big number input
     count = st.number_input(
         "Footfall count",
         min_value=0,
         max_value=10000,
-        value=existing_value if existing_value else 0,
+        value=default_count,
         step=1,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key=f"count_input_{selected_hour}_{selected_date}"
     )
 
     # Quick add buttons - 3 columns
@@ -564,13 +583,9 @@ def show_floor_entry_view():
     quick_values = [10, 50, 100]
     for i, val in enumerate(quick_values):
         with quick_cols[i]:
-            if st.button(f"+{val}", key=f"quick_{val}", use_container_width=True):
+            if st.button(f"+{val}", key=f"quick_{val}_{selected_hour}", use_container_width=True):
                 st.session_state['quick_add'] = count + val
                 st.rerun()
-
-    # Apply quick add
-    if 'quick_add' in st.session_state:
-        count = st.session_state.pop('quick_add')
 
     # Save button
     if st.button("💾 Save Entry", type="primary", use_container_width=True):
@@ -625,9 +640,10 @@ def show_admin_view():
 
 
 def show_admin_dashboard():
-    """Today's overview for all floors."""
+    """Today's overview for all floors with comparison stats."""
     from services.metrics_service import get_daily_total, get_floor_breakdown, get_hourly_trend
     from components.charts import create_hourly_trend_chart, create_floor_bar_chart
+    from datetime import timedelta
 
     today = date.today()
 
@@ -641,6 +657,79 @@ def show_admin_dashboard():
     with col2:
         st.metric("Floors Active", len([v for v in breakdown.values() if v > 0]))
 
+    # Comparison stats
+    st.markdown("### Comparisons")
+
+    # Calculate comparison values
+    def get_average(days_list):
+        """Get average of daily totals for given dates, excluding zeros (N/A days)."""
+        totals = [get_daily_total(d) for d in days_list]
+        valid_totals = [t for t in totals if t > 0]
+        return sum(valid_totals) / len(valid_totals) if valid_totals else None
+
+    def format_comparison(current, comparison):
+        """Format comparison as percentage change."""
+        if comparison is None or comparison == 0:
+            return "N/A", None
+        diff = ((current - comparison) / comparison) * 100
+        return f"{comparison:,.0f}", diff
+
+    # Last 7 days average (excluding today)
+    last_7_days = [today - timedelta(days=i) for i in range(1, 8)]
+    avg_7_days = get_average(last_7_days)
+    avg_7_str, avg_7_diff = format_comparison(total, avg_7_days)
+
+    # This month average (excluding today)
+    month_start = today.replace(day=1)
+    month_days = [(month_start + timedelta(days=i)) for i in range((today - month_start).days)]
+    avg_month = get_average(month_days) if month_days else None
+    avg_month_str, avg_month_diff = format_comparison(total, avg_month)
+
+    # Same weekday average (last 4 occurrences)
+    same_weekdays = [today - timedelta(weeks=i) for i in range(1, 5)]
+    avg_weekday = get_average(same_weekdays)
+    weekday_name = today.strftime("%A")
+    avg_weekday_str, avg_weekday_diff = format_comparison(total, avg_weekday)
+
+    # Last year same date
+    try:
+        last_year_date = today.replace(year=today.year - 1)
+        last_year_total = get_daily_total(last_year_date)
+        last_year_str = f"{last_year_total:,}" if last_year_total > 0 else "N/A"
+        _, last_year_diff = format_comparison(total, last_year_total if last_year_total > 0 else None)
+    except ValueError:  # Feb 29 edge case
+        last_year_str, last_year_diff = "N/A", None
+
+    # Last year same month average
+    try:
+        last_year_month_start = today.replace(year=today.year - 1, day=1)
+        last_year_month_end = (last_year_month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        last_year_month_days = [last_year_month_start + timedelta(days=i)
+                                for i in range((last_year_month_end - last_year_month_start).days + 1)]
+        avg_last_year_month = get_average(last_year_month_days)
+        avg_ly_month_str, avg_ly_month_diff = format_comparison(total, avg_last_year_month)
+    except ValueError:
+        avg_ly_month_str, avg_ly_month_diff = "N/A", None
+
+    # Display comparisons in 2 columns
+    col1, col2 = st.columns(2)
+    with col1:
+        delta_7 = f"{avg_7_diff:+.0f}%" if avg_7_diff is not None else None
+        st.metric("vs 7-Day Avg", avg_7_str, delta=delta_7)
+
+        delta_weekday = f"{avg_weekday_diff:+.0f}%" if avg_weekday_diff is not None else None
+        st.metric(f"vs {weekday_name}s", avg_weekday_str, delta=delta_weekday)
+
+        delta_ly = f"{last_year_diff:+.0f}%" if last_year_diff is not None else None
+        st.metric("vs Last Year Date", last_year_str, delta=delta_ly)
+
+    with col2:
+        delta_month = f"{avg_month_diff:+.0f}%" if avg_month_diff is not None else None
+        st.metric("vs Month Avg", avg_month_str, delta=delta_month)
+
+        delta_ly_month = f"{avg_ly_month_diff:+.0f}%" if avg_ly_month_diff is not None else None
+        st.metric("vs LY Month Avg", avg_ly_month_str, delta=delta_ly_month)
+
     # Floor breakdown
     st.markdown("### By Floor")
     if breakdown:
@@ -650,12 +739,140 @@ def show_admin_dashboard():
     else:
         st.info("No entries yet today")
 
-    # Hourly trend
-    st.markdown("### Hourly Trend")
-    hourly = get_hourly_trend(today)
-    if hourly:
-        fig = create_hourly_trend_chart(hourly, "")
-        st.plotly_chart(fig, use_container_width=True)
+    # Trend charts with options
+    st.markdown("### Trends")
+    trend_option = st.radio(
+        "View",
+        ["Today (Hourly)", "Weekly", "Monthly", "Yearly"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    if trend_option == "Today (Hourly)":
+        hourly = get_hourly_trend(today)
+        if hourly:
+            fig = create_hourly_trend_chart(hourly, "Today's Hourly Trend")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for today yet")
+
+    elif trend_option == "Weekly":
+        # Last 7 days daily totals
+        import plotly.graph_objects as go
+        weekly_data = []
+        for i in range(6, -1, -1):  # 6 days ago to today
+            d = today - timedelta(days=i)
+            day_total = get_daily_total(d)
+            if day_total > 0:  # Skip N/A days
+                weekly_data.append({
+                    'date': d.strftime('%a %d'),
+                    'total': day_total
+                })
+
+        if weekly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=[d['date'] for d in weekly_data],
+                y=[d['total'] for d in weekly_data],
+                mode='lines+markers',
+                line=dict(color='#EA580C', width=2),
+                marker=dict(size=8)
+            ))
+            fig.update_layout(
+                title="Last 7 Days",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 7 days")
+
+    elif trend_option == "Monthly":
+        # Last 30 days daily totals
+        import plotly.graph_objects as go
+        monthly_data = []
+        for i in range(29, -1, -1):  # 29 days ago to today
+            d = today - timedelta(days=i)
+            day_total = get_daily_total(d)
+            if day_total > 0:  # Skip N/A days
+                monthly_data.append({
+                    'date': d.strftime('%d %b'),
+                    'total': day_total
+                })
+
+        if monthly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=[d['date'] for d in monthly_data],
+                y=[d['total'] for d in monthly_data],
+                mode='lines+markers',
+                line=dict(color='#EA580C', width=2),
+                marker=dict(size=6)
+            ))
+            fig.update_layout(
+                title="Last 30 Days",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 30 days")
+
+    elif trend_option == "Yearly":
+        # Last 12 months (monthly totals)
+        import plotly.graph_objects as go
+        from calendar import monthrange
+
+        yearly_data = []
+        for i in range(11, -1, -1):  # 11 months ago to current month
+            # Calculate month
+            month_date = today.replace(day=1)
+            for _ in range(i):
+                month_date = (month_date - timedelta(days=1)).replace(day=1)
+
+            # Get all days in that month
+            _, days_in_month = monthrange(month_date.year, month_date.month)
+            month_total = 0
+            has_data = False
+
+            for day in range(1, days_in_month + 1):
+                try:
+                    d = month_date.replace(day=day)
+                    if d <= today:
+                        day_total = get_daily_total(d)
+                        if day_total > 0:
+                            month_total += day_total
+                            has_data = True
+                except ValueError:
+                    pass
+
+            if has_data:
+                yearly_data.append({
+                    'month': month_date.strftime('%b %Y'),
+                    'total': month_total
+                })
+
+        if yearly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=[d['month'] for d in yearly_data],
+                y=[d['total'] for d in yearly_data],
+                marker_color='#EA580C'
+            ))
+            fig.update_layout(
+                title="Last 12 Months",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 12 months")
 
 
 def show_admin_entry():
@@ -717,21 +934,16 @@ def show_admin_reports():
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("From", value=date.today() - timedelta(days=7), key="report_start")
+        start_date = st.date_input("From", value=date.today() - timedelta(days=7), key="report_start_date")
     with col2:
-        end_date = st.date_input("To", value=date.today(), key="report_end")
+        end_date = st.date_input("To", value=date.today(), key="report_end_date")
 
     if st.button("Generate Report", type="primary"):
         st.session_state['show_report'] = True
-        st.session_state['report_start'] = start_date
-        st.session_state['report_end'] = end_date
 
     # Show report if generated
     if st.session_state.get('show_report'):
-        report_start = st.session_state.get('report_start', start_date)
-        report_end = st.session_state.get('report_end', end_date)
-
-        entries = get_entries_for_date_range(report_start, report_end)
+        entries = get_entries_for_date_range(start_date, end_date)
         floors = get_floors(active_only=False)
         floor_names = {f['floor_id']: f['floor_name'] for f in floors}
 
@@ -773,11 +985,11 @@ def show_admin_reports():
             st.dataframe(df, use_container_width=True, hide_index=True)
 
             # CSV download
-            csv_data = export_to_csv(report_start, report_end)
+            csv_data = export_to_csv(start_date, end_date)
             st.download_button(
                 "📥 Download CSV",
                 data=csv_data,
-                file_name=f"footfall_{report_start}_{report_end}.csv",
+                file_name=f"footfall_{start_date}_{end_date}.csv",
                 mime="text/csv"
             )
         else:
