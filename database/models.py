@@ -138,10 +138,10 @@ DEFAULT_SETTINGS = {
 
 # Default floors to be inserted on first run
 DEFAULT_FLOORS = [
-    {'floor_name': 'Ground Floor', 'display_order': 1},
-    {'floor_name': 'First Floor', 'display_order': 2},
-    {'floor_name': 'Second Floor', 'display_order': 3},
-    {'floor_name': 'Third Floor', 'display_order': 4},
-    {'floor_name': 'Fourth Floor', 'display_order': 5},
-    {'floor_name': 'Fifth Floor', 'display_order': 6},
+    {'floor_name': 'Basement', 'display_order': 1},
+    {'floor_name': 'Ground', 'display_order': 2},
+    {'floor_name': 'Upper Ground', 'display_order': 3},
+    {'floor_name': 'First', 'display_order': 4},
+    {'floor_name': 'Second', 'display_order': 5},
+    {'floor_name': 'Third', 'display_order': 6},
 ]

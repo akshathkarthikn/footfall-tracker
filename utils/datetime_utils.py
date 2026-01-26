@@ -19,16 +19,27 @@ def get_hour_slots() -> list[int]:
     return list(range(opening, closing + 1))
 
 
-def format_hour_slot(hour: int) -> str:
-    """Format an hour slot for display (e.g., '9 AM', '2 PM')."""
-    if hour == 0:
-        return "12 AM"
-    elif hour < 12:
-        return f"{hour} AM"
-    elif hour == 12:
-        return "12 PM"
-    else:
-        return f"{hour - 12} PM"
+def format_hour_slot(hour: int, period: bool = True) -> str:
+    """
+    Format an hour slot for display.
+    If period=True: '9 AM - 10 AM' format
+    If period=False: '9 AM' format (for compact display)
+    """
+    def format_single_hour(h: int) -> str:
+        if h == 0:
+            return "12 AM"
+        elif h < 12:
+            return f"{h} AM"
+        elif h == 12:
+            return "12 PM"
+        else:
+            return f"{h - 12} PM"
+
+    start = format_single_hour(hour)
+    if period:
+        end = format_single_hour((hour + 1) % 24)
+        return f"{start} - {end}"
+    return start
 
 
 def get_hour_slot_options() -> list[tuple[int, str]]:
