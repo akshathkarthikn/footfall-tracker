@@ -739,12 +739,140 @@ def show_admin_dashboard():
     else:
         st.info("No entries yet today")
 
-    # Hourly trend
-    st.markdown("### Hourly Trend")
-    hourly = get_hourly_trend(today)
-    if hourly:
-        fig = create_hourly_trend_chart(hourly, "")
-        st.plotly_chart(fig, use_container_width=True)
+    # Trend charts with options
+    st.markdown("### Trends")
+    trend_option = st.radio(
+        "View",
+        ["Today (Hourly)", "Weekly", "Monthly", "Yearly"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    if trend_option == "Today (Hourly)":
+        hourly = get_hourly_trend(today)
+        if hourly:
+            fig = create_hourly_trend_chart(hourly, "Today's Hourly Trend")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for today yet")
+
+    elif trend_option == "Weekly":
+        # Last 7 days daily totals
+        import plotly.graph_objects as go
+        weekly_data = []
+        for i in range(6, -1, -1):  # 6 days ago to today
+            d = today - timedelta(days=i)
+            day_total = get_daily_total(d)
+            if day_total > 0:  # Skip N/A days
+                weekly_data.append({
+                    'date': d.strftime('%a %d'),
+                    'total': day_total
+                })
+
+        if weekly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=[d['date'] for d in weekly_data],
+                y=[d['total'] for d in weekly_data],
+                mode='lines+markers',
+                line=dict(color='#EA580C', width=2),
+                marker=dict(size=8)
+            ))
+            fig.update_layout(
+                title="Last 7 Days",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 7 days")
+
+    elif trend_option == "Monthly":
+        # Last 30 days daily totals
+        import plotly.graph_objects as go
+        monthly_data = []
+        for i in range(29, -1, -1):  # 29 days ago to today
+            d = today - timedelta(days=i)
+            day_total = get_daily_total(d)
+            if day_total > 0:  # Skip N/A days
+                monthly_data.append({
+                    'date': d.strftime('%d %b'),
+                    'total': day_total
+                })
+
+        if monthly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=[d['date'] for d in monthly_data],
+                y=[d['total'] for d in monthly_data],
+                mode='lines+markers',
+                line=dict(color='#EA580C', width=2),
+                marker=dict(size=6)
+            ))
+            fig.update_layout(
+                title="Last 30 Days",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 30 days")
+
+    elif trend_option == "Yearly":
+        # Last 12 months (monthly totals)
+        import plotly.graph_objects as go
+        from calendar import monthrange
+
+        yearly_data = []
+        for i in range(11, -1, -1):  # 11 months ago to current month
+            # Calculate month
+            month_date = today.replace(day=1)
+            for _ in range(i):
+                month_date = (month_date - timedelta(days=1)).replace(day=1)
+
+            # Get all days in that month
+            _, days_in_month = monthrange(month_date.year, month_date.month)
+            month_total = 0
+            has_data = False
+
+            for day in range(1, days_in_month + 1):
+                try:
+                    d = month_date.replace(day=day)
+                    if d <= today:
+                        day_total = get_daily_total(d)
+                        if day_total > 0:
+                            month_total += day_total
+                            has_data = True
+                except ValueError:
+                    pass
+
+            if has_data:
+                yearly_data.append({
+                    'month': month_date.strftime('%b %Y'),
+                    'total': month_total
+                })
+
+        if yearly_data:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=[d['month'] for d in yearly_data],
+                y=[d['total'] for d in yearly_data],
+                marker_color='#EA580C'
+            ))
+            fig.update_layout(
+                title="Last 12 Months",
+                xaxis_title="",
+                yaxis_title="Total Footfall",
+                height=300,
+                margin=dict(l=40, r=20, t=40, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data for the last 12 months")
 
 
 def show_admin_entry():
