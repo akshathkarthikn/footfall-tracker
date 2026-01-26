@@ -809,6 +809,17 @@ def show_admin_settings():
 
     st.markdown("---")
 
+    # Reset floors to defaults
+    st.markdown("### Reset Floors")
+    st.info("Reset floors to: Basement, Ground, Upper Ground, First, Second, Third")
+    if st.button("🔄 Reset Floors to Defaults"):
+        from database.db import reset_floors_to_defaults
+        count = reset_floors_to_defaults()
+        st.success(f"Reset to {count} default floors.")
+        st.rerun()
+
+    st.markdown("---")
+
     # Danger zone - Reset data
     st.markdown("### Danger Zone")
     st.warning("This will permanently delete ALL footfall entries and audit logs.")

@@ -113,3 +113,17 @@ def set_setting(key: str, value: str, user_id: int = None):
         else:
             db.add(Settings(key=key, value=value, updated_by=user_id))
         db.commit()
+
+
+def reset_floors_to_defaults():
+    """Reset floors to default values."""
+    with get_db_session() as db:
+        # Delete existing floors
+        db.query(Floor).delete()
+
+        # Insert default floors
+        for floor_data in DEFAULT_FLOORS:
+            db.add(Floor(**floor_data))
+
+        db.commit()
+    return len(DEFAULT_FLOORS)
