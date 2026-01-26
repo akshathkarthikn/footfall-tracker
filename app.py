@@ -36,10 +36,47 @@ st.markdown("""
     header {visibility: hidden;}
     .stDeployButton {display: none;}
 
-    /* Mobile-first base */
+    /* Mobile-first base - ensure page is scrollable */
     .main .block-container {
         padding: 0.75rem 0.75rem 5rem 0.75rem !important;
         max-width: 100% !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* ============================================
+       MOBILE SCROLL FIX
+       Ensure page scrolls when keyboard is open
+       ============================================ */
+
+    /* Main container should always be scrollable */
+    .main {
+        overflow-y: auto !important;
+        height: 100vh !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Ensure the app view is scrollable */
+    [data-testid="stAppViewContainer"] {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Fix for selectbox/dropdown popup - make it scrollable */
+    [data-baseweb="popover"] {
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+    }
+
+    [data-baseweb="menu"] {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+
+    /* Date input popup fix */
+    [data-baseweb="calendar"] {
+        max-height: 50vh !important;
+        overflow-y: auto !important;
     }
 
     /* ============================================
@@ -139,6 +176,23 @@ st.markdown("""
         display: inline-block;
     }
 
+    /* Date badge */
+    .date-badge {
+        background: #f3f4f6;
+        color: #374151;
+        padding: 0.3rem 0.75rem;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    .date-badge.today {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
     /* Stats cards - compact for mobile */
     .stat-card {
         background: white;
@@ -211,9 +265,13 @@ st.markdown("""
         display: none;
     }
 
-    /* Selectbox styling */
+    /* Selectbox styling - scrollable dropdown */
     .stSelectbox > div > div {
         font-size: 18px !important;
+    }
+
+    .stSelectbox [data-baseweb="select"] > div {
+        max-height: 50px !important;
     }
 
     /* Tab styling */
@@ -272,6 +330,25 @@ st.markdown("""
     /* Make column gaps tighter on mobile */
     [data-testid="stHorizontalBlock"] {
         gap: 0.4rem !important;
+    }
+
+    /* Date input compact styling */
+    .stDateInput > div > div {
+        font-size: 14px !important;
+    }
+
+    .stDateInput input {
+        height: 40px !important;
+        font-size: 14px !important;
+    }
+
+    /* Dataframe/table styling for mobile */
+    .stDataFrame {
+        font-size: 12px !important;
+    }
+
+    [data-testid="stDataFrame"] > div {
+        overflow-x: auto !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -361,6 +438,8 @@ def show_login():
 
 def show_floor_entry_view():
     """Streamlined entry view for floor staff - one floor only."""
+    from datetime import timedelta
+
     user = get_current_user()
     floor_id = user.get('floor_id')
     floor_name = user.get('floor_name')
@@ -374,16 +453,27 @@ def show_floor_entry_view():
             logout()
             st.rerun()
 
+    # Date selector - allow past dates for retroactive editing
     today = date.today()
-    current_hour = get_current_hour_slot()
+    selected_date = st.date_input(
+        "Date",
+        value=st.session_state.get('selected_date', today),
+        max_value=today,
+        min_value=today - timedelta(days=30),  # Allow up to 30 days back
+        key="entry_date"
+    )
+    st.session_state['selected_date'] = selected_date
+
+    is_today = selected_date == today
+    current_hour = get_current_hour_slot() if is_today else None
     hour_slots = get_hour_slots()
 
-    # Get existing entries for today
-    entries = get_entries_for_date(today, floor_id)
+    # Get existing entries for selected date
+    entries = get_entries_for_date(selected_date, floor_id)
     entries_by_hour = {e['hour_slot']: e['count'] for e in entries}
 
-    # Today's stats
-    total_today = sum(entries_by_hour.values())
+    # Stats for selected date
+    total_count = sum(entries_by_hour.values())
     filled_hours = len(entries_by_hour)
     total_hours = len(hour_slots)
 
@@ -392,8 +482,8 @@ def show_floor_entry_view():
     with col1:
         st.markdown(f'''
             <div class="stat-card">
-                <div class="stat-value">{total_today:,}</div>
-                <div class="stat-label">Today</div>
+                <div class="stat-value">{total_count:,}</div>
+                <div class="stat-label">Total</div>
             </div>
         ''', unsafe_allow_html=True)
     with col2:
@@ -405,7 +495,7 @@ def show_floor_entry_view():
         ''', unsafe_allow_html=True)
     with col3:
         last_entry = max(entries_by_hour.keys()) if entries_by_hour else None
-        last_str = format_hour_slot(last_entry) if last_entry else "-"
+        last_str = format_hour_slot(last_entry, period=False) if last_entry else "-"
         st.markdown(f'''
             <div class="stat-card">
                 <div class="stat-value">{last_str}</div>
@@ -418,7 +508,11 @@ def show_floor_entry_view():
     # Hour selection with big buttons
     st.markdown("### Select Hour")
 
-    selected_hour = st.session_state.get('selected_hour', current_hour)
+    # Default to current hour if today, else first slot
+    default_hour = current_hour if is_today and current_hour in hour_slots else hour_slots[0]
+    selected_hour = st.session_state.get('selected_hour', default_hour)
+    if selected_hour not in hour_slots:
+        selected_hour = hour_slots[0]
 
     # Show hours in a 2-column grid for mobile friendliness
     for row_start in range(0, len(hour_slots), 2):
@@ -428,10 +522,10 @@ def show_floor_entry_view():
         for i, hour in enumerate(row_hours):
             with cols[i]:
                 existing_count = entries_by_hour.get(hour)
-                is_current = hour == current_hour
+                is_current = is_today and hour == current_hour
                 is_selected = hour == selected_hour
 
-                # Compact button label
+                # Period format for button label (compact)
                 label = format_hour_slot(hour)
                 if existing_count is not None:
                     label += f" ✓"
@@ -440,14 +534,16 @@ def show_floor_entry_view():
 
                 btn_type = "primary" if is_selected else "secondary"
 
-                if st.button(label, key=f"hour_{hour}", type=btn_type, use_container_width=True):
+                if st.button(label, key=f"hour_{hour}_{selected_date}", type=btn_type, use_container_width=True):
                     st.session_state['selected_hour'] = hour
                     st.rerun()
 
     st.markdown("---")
 
     # Entry form for selected hour
-    selected_hour = st.session_state.get('selected_hour', current_hour)
+    selected_hour = st.session_state.get('selected_hour', default_hour)
+    if selected_hour not in hour_slots:
+        selected_hour = hour_slots[0]
     existing_value = entries_by_hour.get(selected_hour)
 
     st.markdown(f"### {format_hour_slot(selected_hour)}")
@@ -480,7 +576,7 @@ def show_floor_entry_view():
     if st.button("💾 Save Entry", type="primary", use_container_width=True):
         if count > 0:
             success, msg, was_update = save_entry(
-                entry_date=today,
+                entry_date=selected_date,
                 hour_slot=selected_hour,
                 floor_id=floor_id,
                 count=count,
@@ -611,26 +707,81 @@ def show_admin_entry():
 
 
 def show_admin_reports():
-    """Export and comparison tools."""
+    """Reports with table view and optional CSV export."""
     from services.export_service import export_to_csv
+    from services.entry_service import get_entries_for_date_range, get_floors
     from datetime import timedelta
+    import pandas as pd
 
-    st.markdown("### Export Data")
+    st.markdown("### Reports")
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("From", value=date.today() - timedelta(days=7))
+        start_date = st.date_input("From", value=date.today() - timedelta(days=7), key="report_start")
     with col2:
-        end_date = st.date_input("To", value=date.today())
+        end_date = st.date_input("To", value=date.today(), key="report_end")
 
-    if st.button("Download CSV", type="primary"):
-        csv_data = export_to_csv(start_date, end_date)
-        st.download_button(
-            "📥 Download",
-            data=csv_data,
-            file_name=f"footfall_{start_date}_{end_date}.csv",
-            mime="text/csv"
-        )
+    if st.button("Generate Report", type="primary"):
+        st.session_state['show_report'] = True
+        st.session_state['report_start'] = start_date
+        st.session_state['report_end'] = end_date
+
+    # Show report if generated
+    if st.session_state.get('show_report'):
+        report_start = st.session_state.get('report_start', start_date)
+        report_end = st.session_state.get('report_end', end_date)
+
+        entries = get_entries_for_date_range(report_start, report_end)
+        floors = get_floors(active_only=False)
+        floor_names = {f['floor_id']: f['floor_name'] for f in floors}
+
+        if entries:
+            # Create dataframe for display
+            records = []
+            for entry in entries:
+                records.append({
+                    'Date': entry['date'].strftime('%Y-%m-%d'),
+                    'Day': entry['date'].strftime('%a'),
+                    'Hour': format_hour_slot(entry['hour_slot']),
+                    'Floor': floor_names.get(entry['floor_id'], f"Floor {entry['floor_id']}"),
+                    'Count': entry['count'],
+                })
+            df = pd.DataFrame(records)
+
+            # Summary stats
+            total = df['Count'].sum()
+            days_count = df['Date'].nunique()
+            avg_daily = total / days_count if days_count > 0 else 0
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total", f"{total:,}")
+            with col2:
+                st.metric("Days", days_count)
+            with col3:
+                st.metric("Avg/Day", f"{avg_daily:,.0f}")
+
+            # Floor breakdown
+            st.markdown("**By Floor:**")
+            floor_totals = df.groupby('Floor')['Count'].sum().sort_values(ascending=False)
+            for floor, floor_total in floor_totals.items():
+                pct = (floor_total / total * 100) if total > 0 else 0
+                st.progress(pct / 100, text=f"{floor}: {floor_total:,} ({pct:.0f}%)")
+
+            # Data table
+            st.markdown("**Details:**")
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+            # CSV download
+            csv_data = export_to_csv(report_start, report_end)
+            st.download_button(
+                "📥 Download CSV",
+                data=csv_data,
+                file_name=f"footfall_{report_start}_{report_end}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No data found for the selected date range")
 
 
 def show_admin_settings():
