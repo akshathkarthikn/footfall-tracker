@@ -833,7 +833,6 @@ def show_admin_settings():
                 db.commit()
 
             st.success(f"Deleted {entry_count} entries and {log_count} audit logs.")
-            st.session_state['reset_confirm'] = ""
             st.rerun()
         else:
             st.error("Please type 'delete' to confirm.")
