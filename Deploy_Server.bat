@@ -2,44 +2,81 @@
 setlocal
 cd /d "%~dp0"
 
-:: --- Check for Admin ---
+:: ============================================
+:: CONFIGURATION - Edit these for each app
+:: ============================================
+set APP_NAME=Footfall Tracker
+set SERVICE_NAME=FootfallTrackerService
+set APP_PORT=8501
+set STARTUP_DELAY=0001:00
+
+:: Delay format: HHMM:SS (0001:00 = 1 minute, 0002:00 = 2 minutes)
+:: Stagger delays for multiple apps to prevent CPU spike at boot
+
+:: ============================================
+:: ADMIN CHECK
+:: ============================================
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Run as Administrator!
+    echo [ERROR] Please run as Administrator!
+    echo Right-click this file and select "Run as administrator"
     pause
     exit /b
 )
 
+echo.
 echo ============================================
-echo   Footfall Tracker - Server Deployment
+echo   %APP_NAME% - Server Deployment
 echo ============================================
 echo.
 
-:: --- 1. Open Firewall (Port 8501) ---
-echo [INFO] Opening firewall port 8501...
-netsh advfirewall firewall add rule name="Footfall Tracker" dir=in action=allow protocol=TCP localport=8501
+:: ============================================
+:: 1. FIREWALL RULE
+:: ============================================
+echo [1/2] Opening firewall port %APP_PORT%...
+netsh advfirewall firewall delete rule name="%APP_NAME%" >nul 2>&1
+netsh advfirewall firewall add rule name="%APP_NAME%" dir=in action=allow protocol=TCP localport=%APP_PORT%
+echo       Done.
+echo.
 
-:: --- 2. Create Scheduled Task (At Startup) ---
+:: ============================================
+:: 2. SCHEDULED TASK (Windows Service)
+:: ============================================
+echo [2/2] Creating startup service...
 set "BATCH_PATH=%~dp0Run_App.bat"
 
-echo [INFO] Creating startup service...
-:: /sc onstart = Run at boot
-:: /ru "%USERNAME%" /rp * = Run as specific user (prompt for password)
-:: /rl highest = Run as Admin level
-:: /delay 0001:00 = Wait 1 minute after boot before starting
-schtasks /create /tn "FootfallTrackerService" /tr "\"%BATCH_PATH%\"" /sc onstart /delay 0001:00 /ru "%USERNAME%" /rp * /rl highest /f
+:: Remove existing task if any
+schtasks /delete /tn "%SERVICE_NAME%" /f >nul 2>&1
 
+:: Create new task
+:: /sc onstart  = Run at Windows boot (no login required)
+:: /delay       = Wait before starting (stagger multiple apps)
+:: /ru /rp      = Run as user (will prompt for password)
+:: /rl highest  = Run with elevated privileges
+schtasks /create /tn "%SERVICE_NAME%" /tr "\"%BATCH_PATH%\"" /sc onstart /delay %STARTUP_DELAY% /ru "%USERNAME%" /rp * /rl highest /f
+
+echo       Done.
 echo.
+
+:: ============================================
+:: SUCCESS
+:: ============================================
 echo ============================================
-echo [OK] Service Installed Successfully!
+echo [OK] Deployment Complete!
 echo.
-echo The app will:
-echo   - Start automatically at Windows boot
-echo   - Auto-restart if it crashes
-echo   - Be accessible at http://localhost:8501
-echo   - Be accessible on LAN at http://YOUR_IP:8501
+echo Configuration:
+echo   - App Name:    %APP_NAME%
+echo   - Port:        %APP_PORT%
+echo   - Startup:     %STARTUP_DELAY% after boot
+echo   - Service:     %SERVICE_NAME%
 echo.
-echo To start now, run: Run_App.bat
-echo To uninstall: schtasks /delete /tn "FootfallTrackerService" /f
+echo Access URLs:
+echo   - Local:       http://localhost:%APP_PORT%
+echo   - LAN:         http://YOUR_IP:%APP_PORT%
+echo.
+echo Commands:
+echo   - Start now:   Run_App.bat
+echo   - Stop:        taskkill /f /im streamlit.exe
+echo   - Uninstall:   schtasks /delete /tn "%SERVICE_NAME%" /f
 echo ============================================
 pause
