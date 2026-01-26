@@ -106,8 +106,10 @@ st.markdown("""
     .stNumberInput input {
         font-size: 32px !important;
         height: 70px !important;
+        line-height: 70px !important;
         text-align: center !important;
         border-radius: 12px !important;
+        padding: 0 !important;
     }
 
     .stNumberInput [data-testid="stNumberInputContainer"] {
@@ -123,7 +125,15 @@ st.markdown("""
     .stTextInput input {
         font-size: 18px !important;
         height: 50px !important;
+        line-height: 50px !important;
         border-radius: 12px !important;
+        padding: 0 1rem !important;
+    }
+
+    /* Fix text vertical alignment in all inputs */
+    input[type="text"], input[type="password"], input[type="number"] {
+        display: flex !important;
+        align-items: center !important;
     }
 
     /* Big buttons */
@@ -717,21 +727,16 @@ def show_admin_reports():
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input("From", value=date.today() - timedelta(days=7), key="report_start")
+        start_date = st.date_input("From", value=date.today() - timedelta(days=7), key="report_start_date")
     with col2:
-        end_date = st.date_input("To", value=date.today(), key="report_end")
+        end_date = st.date_input("To", value=date.today(), key="report_end_date")
 
     if st.button("Generate Report", type="primary"):
         st.session_state['show_report'] = True
-        st.session_state['report_start'] = start_date
-        st.session_state['report_end'] = end_date
 
     # Show report if generated
     if st.session_state.get('show_report'):
-        report_start = st.session_state.get('report_start', start_date)
-        report_end = st.session_state.get('report_end', end_date)
-
-        entries = get_entries_for_date_range(report_start, report_end)
+        entries = get_entries_for_date_range(start_date, end_date)
         floors = get_floors(active_only=False)
         floor_names = {f['floor_id']: f['floor_name'] for f in floors}
 
