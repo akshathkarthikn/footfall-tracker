@@ -786,7 +786,8 @@ def show_admin_reports():
 
 def show_admin_settings():
     """Basic settings."""
-    from database.db import get_setting, set_setting
+    from database.db import get_setting, set_setting, get_db_session
+    from database.models import FootfallEntry, AuditLog
     from services.entry_service import get_floors
     from auth.auth import get_all_users
 
@@ -805,6 +806,37 @@ def show_admin_settings():
     st.markdown("### Settings")
     st.text(f"Opening hour: {get_setting('opening_hour', '9')}")
     st.text(f"Closing hour: {get_setting('closing_hour', '21')}")
+
+    st.markdown("---")
+
+    # Danger zone - Reset data
+    st.markdown("### Danger Zone")
+    st.warning("This will permanently delete ALL footfall entries and audit logs.")
+
+    confirm_text = st.text_input(
+        "Type 'delete' to confirm data reset",
+        key="reset_confirm",
+        placeholder="Type 'delete' to confirm"
+    )
+
+    if st.button("🗑️ Reset All Data", type="secondary"):
+        if confirm_text.lower() == "delete":
+            with get_db_session() as db:
+                # Delete all footfall entries
+                entry_count = db.query(FootfallEntry).count()
+                db.query(FootfallEntry).delete()
+
+                # Delete all audit logs
+                log_count = db.query(AuditLog).count()
+                db.query(AuditLog).delete()
+
+                db.commit()
+
+            st.success(f"Deleted {entry_count} entries and {log_count} audit logs.")
+            st.session_state['reset_confirm'] = ""
+            st.rerun()
+        else:
+            st.error("Please type 'delete' to confirm.")
 
     st.markdown("---")
     st.caption("For full admin features, access from desktop browser")
