@@ -7,7 +7,7 @@ cd /d "%~dp0"
 :: ============================================
 set APP_NAME=Footfall Tracker
 set SERVICE_NAME=FootfallTrackerService
-set APP_PORT=8501
+set APP_PORT=8502
 set STARTUP_DELAY=0001:00
 
 :: Delay format: HHMM:SS (0001:00 = 1 minute, 0002:00 = 2 minutes)
