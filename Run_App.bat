@@ -6,7 +6,7 @@ cd /d "%~dp0"
 :: CONFIGURATION - Edit these for each app
 :: ============================================
 set APP_NAME=Footfall Tracker
-set APP_PORT=8501
+set APP_PORT=8502
 set APP_FILE=app.py
 
 :: ============================================
